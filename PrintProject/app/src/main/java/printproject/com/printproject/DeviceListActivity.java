@@ -33,6 +33,9 @@ public class DeviceListActivity extends Activity {
     // Debugging
     private static final String TAG = "DeviceListActivity";
     private static final boolean D = true;
+    public static final String PERMISSIONS_REQUEST_LOCATION=100;
+    public static final int CURRENT_ANDROID_VERSION = android.os.Build.VERSION.SDK_INT;
+    
 
     // Return Intent extra
     public static String EXTRA_DEVICE_ADDRESS = "device_address";
@@ -41,6 +44,7 @@ public class DeviceListActivity extends Activity {
     private BluetoothAdapter mBtAdapter;
     private ArrayAdapter<String> mPairedDevicesArrayAdapter;
     private ArrayAdapter<String> mNewDevicesArrayAdapter;
+    private AlertDialog.Builder alertDialogBuilder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,14 +55,15 @@ public class DeviceListActivity extends Activity {
 
         // Set result CANCELED incase the user backs out
         setResult(Activity.RESULT_CANCELED);
+        
+        alertDialogBuilder = new AlertDialog.Builder(
+				getApplicationContext());
 
         // Initialize the button to perform device discovery
         Button scanButton = (Button) findViewById(R.id.button_scan);
         scanButton.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-            	mNewDevicesArrayAdapter.clear();
-                doDiscovery();
-                //v.setVisibility(View.GONE);
+            permissionChecking();
             }
         });
         
@@ -102,7 +107,91 @@ public class DeviceListActivity extends Activity {
             mPairedDevicesArrayAdapter.add(noDevices);
         }
     }
+    
+    private void permissionChecking(){
+	  //--------------------------------------LOCATION Requesting Permission at Run Time--------------------------------------
+      	// Here, thisActivity is the current activity
+      	
+      	if (CURRENT_ANDROID_VERSION >= Build.VERSION_CODES.M) { //Marshmallow
+    
+      		if (ContextCompat.checkSelfPermission(DeviceListActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION)
+      				!= PackageManager.PERMISSION_GRANTED) {
+    
+      			// Should we show an explanation? This method returns true if the app has requested this
+      			// permission previously and the user denied the request.
+      			if (ActivityCompat.shouldShowRequestPermissionRationale(DeviceListActivity.this,
+      					Manifest.permission.ACCESS_COARSE_LOCATION)) {
+    
+      				// Show an explanation to the user *asynchronously* -- don't block
+      				// this thread waiting for the user's response! After the user
+      				// sees the explanation, try again to request the permission.
+      				
+      	
+    			alertDialogBuilder.setTitle("Location Service");
+    			alertDialogBuilder
+    				.setMessage("We need to access your device's location service in order to use bluetooth.")
+    				.setCancelable(false)
+    				.setPositiveButton("Allow",new DialogInterface.OnClickListener() {
+    					public void onClick(DialogInterface dialog,int id) {
+    							ActivityCompat.requestPermissions(DeviceListActivity.this,
+          								new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+          								PERMISSIONS_REQUEST_LOCATION);
+          								dialog.cancel();
+    					}
+    				  })
+    				.setNegativeButton("Not allow",new DialogInterface.OnClickListener() {
+    					public void onClick(DialogInterface dialog,int id) {
+    						dialog.cancel();
+    					}
+    				});
+    
+    				// create alert dialog
+    				AlertDialog alertDialog = alertDialogBuilder.create();
+    				alertDialog.show();
+      			} else {// No explanation needed, we can request the permission.
+    
+      				ActivityCompat.requestPermissions(DeviceListActivity.this,
+      						new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+      						PERMISSIONS_REQUEST_LOCATION);
+    
+      				// MY_PERMISSIONS_REQUEST_EXTERNAL_STORAGE is an
+      				// app-defined int constant. The callback method gets the
+      				// result of the request.
+      			}
+      		}else{ //permission already granted
+      			mNewDevicesArrayAdapter.clear();
+                doDiscovery();
+      		}
+      	}else{//android version lower than 23
+      		mNewDevicesArrayAdapter.clear();
+            doDiscovery();
+      	}
+    }
+    
+    //When your app requests permissions, the system presents a dialog box to the user.
+  	//When the user responds, the system invokes your app's onRequestPermissionsResult()
+  	//method, passing it the user response.
+  	@Override
+  	public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
 
+  		switch (requestCode) {
+  			case PERMISSIONS_REQUEST_LOCATION: {
+  				// If request is cancelled, the result arrays are empty.
+  				if (grantResults.length > 0
+  						&& grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+  					mNewDevicesArrayAdapter.clear();
+  		            doDiscovery();
+
+  				} else {
+                      Toast.makeText(DeviceListActivity.this,"Permission is Denied!",Toast.LENGTH_LONG).show();
+  				}
+  				return;
+  			}
+
+  			// other 'case' lines to check for other
+  			// permissions this app might request
+  		}
+  	}
 
     @Override
     protected void onDestroy() {
